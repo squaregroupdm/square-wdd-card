@@ -69,6 +69,7 @@
   }
   .ring::after{
     content:""; position:absolute; inset:-14px;
+    pointer-events:none; /* let taps pass through the ring to the button */
     border-radius:50%;
     border:14px solid var(--blue);
     opacity:0;
@@ -311,6 +312,12 @@ function sizeVideo(){
 }
 video.addEventListener('loadedmetadata', sizeVideo);
 
+// If the video file itself cannot be loaded, say so instead of failing silently.
+video.addEventListener('error', () => {
+  trouble.textContent = 'ভিডিওটি লোড করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন। [MediaError]';
+  trouble.classList.add('show');
+});
+
 /* --- The tap that starts everything, and unlocks sound --- */
 goButton.addEventListener('click', async () => {
   goButton.disabled = true;
@@ -341,7 +348,7 @@ goButton.addEventListener('click', async () => {
   }catch(e){
     startScreen.style.display = 'flex';
     goButton.disabled = false;
-    trouble.textContent = 'ক্যামেরা চালু করা গেল না। ব্রাউজারের সেটিংসে ক্যামেরার অনুমতি দিন, তারপর আবার চেষ্টা করুন।';
+    trouble.textContent = 'ক্যামেরা চালু করা গেল না। ব্রাউজারের সেটিংসে ক্যামেরার অনুমতি দিন, তারপর আবার চেষ্টা করুন। [' + (e && e.name ? e.name : 'Error') + ']';
     trouble.classList.add('show');
     return;
   }
