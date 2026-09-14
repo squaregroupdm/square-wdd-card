@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#06101c">
 <title>Square | তিনি আপনাকে কিছু বলতে চান</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,200 +13,411 @@
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-<!--
-  ============================================================
-  SETTINGS YOU MIGHT WANT TO CHANGE LATER
-  All of them live in the small SETTINGS block further down,
-  just search the page for the word SETTINGS.
-  ============================================================
--->
-
 <style>
   :root{
-    --ink:#111418;
-    --muted:#5d6670;
     --blue:#1F84E8;
-    --paper:#ffffff;
+    --blue-light:#6FB6FF;
+    --blue-deep:#0B4FA3;
+    --ink:#06101c;
+    --glass:rgba(255,255,255,.07);
+    --glass-edge:rgba(255,255,255,.42);
+    --text:#F4F7FB;
+    --text-dim:rgba(244,247,251,.7);
+    --px:0; --py:0;   /* parallax offsets, set by touch */
   }
 
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
   html,body{
-    margin:0; padding:0;
-    height:100%;
-    overflow:hidden;
-    background:var(--paper);
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--ink);
     font-family:'Hind Siliguri', system-ui, sans-serif;
-    color:var(--ink);
+    color:var(--text);
   }
-
   a-scene{ width:100vw; height:100vh; }
+  .hidden{ opacity:0 !important; pointer-events:none !important; }
 
-  /* ---------- Opening screen ---------- */
+  /* ======================= LANDING ======================= */
   #start{
     position:fixed; inset:0; z-index:40;
-    background:var(--paper);
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
-    padding:32px 28px calc(32px + env(safe-area-inset-bottom));
-    text-align:center;
-  }
-
-  .mark{
-    position:absolute; top:calc(22px + env(safe-area-inset-top)); left:24px;
-    display:flex; flex-direction:column; gap:4px; align-items:flex-start;
-  }
-  .grid{ display:grid; grid-template-columns:repeat(3,12px); gap:3px; }
-  .grid i{ display:block; width:12px; height:12px; background:#22B24C; }
-  .mark span{ font:700 11px/1 system-ui, sans-serif; letter-spacing:.14em; color:#D8232A; }
-
-  .ring{
-    position:relative;
-    width:min(62vw, 244px); aspect-ratio:1;
-    border-radius:50%;
-    border:14px solid var(--blue);
     display:grid; place-items:center;
-    margin-bottom:38px;
+    padding:24px;
+    background:
+      radial-gradient(120% 90% at 50% 115%, rgba(6,16,28,.9) 0%, rgba(6,16,28,.35) 50%, rgba(6,16,28,.6) 100%);
+    transition:opacity .6s ease, transform .6s ease;
+    overflow:hidden;
   }
-  .ring::after{
-    content:""; position:absolute; inset:-14px;
-    pointer-events:none; /* let taps pass through the ring to the button */
-    border-radius:50%;
-    border:14px solid var(--blue);
+  #start.away{ opacity:0; transform:scale(1.05); pointer-events:none; }
+
+  /* drifting glucose particles */
+  .dust{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .dust i{
+    position:absolute; bottom:-6vh;
+    width:6px; height:6px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #fff, var(--blue-light) 55%, transparent 70%);
     opacity:0;
-    animation:pulse 2.8s ease-out 1.2s 2;
+    filter:blur(.3px);
+    animation:rise linear infinite;
   }
-  @keyframes pulse{
-    0%{ opacity:.45; transform:scale(1); }
-    100%{ opacity:0; transform:scale(1.22); }
-  }
-  .ring button{
-    width:64%; aspect-ratio:1; border:0; border-radius:50%;
-    background:var(--blue); color:#fff;
-    font-family:inherit; font-size:17px; font-weight:600; line-height:1.35;
-    cursor:pointer;
-    transition:transform .18s ease;
-  }
-  .ring button:active{ transform:scale(.95); }
-  .ring button:focus-visible{ outline:3px solid var(--ink); outline-offset:6px; }
-
-  #start h1{
-    margin:0 0 10px;
-    font-size:clamp(25px, 6.6vw, 33px);
-    font-weight:700; line-height:1.35;
-    max-width:17ch;
-  }
-  #start p{
-    margin:0;
-    font-size:16px; line-height:1.6; color:var(--muted);
-    max-width:26ch;
+  @keyframes rise{
+    0%{ transform:translateY(0) translateX(0); opacity:0; }
+    12%{ opacity:.85; }
+    88%{ opacity:.5; }
+    100%{ transform:translateY(-112vh) translateX(var(--sway)); opacity:0; }
   }
 
-  /* ---------- Overlays while the camera is open ---------- */
-  .overlay{
-    position:fixed; z-index:30;
-    left:0; right:0;
-    display:flex; flex-direction:column; align-items:center;
+  /* logo tile */
+  .brand{
+    position:absolute; top:calc(16px + env(safe-area-inset-top)); left:16px;
+    width:54px; height:54px; border-radius:16px;
+    background:#fff;
+    display:grid; place-items:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.6);
+    animation:drop .7s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .brand img{ width:34px; height:auto; display:block; }
+
+  /* day badge */
+  .badge{
+    position:absolute; top:calc(22px + env(safe-area-inset-top)); right:16px;
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px 8px 10px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.3);
+    background:rgba(255,255,255,.1);
+    -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+    font-size:12px; font-weight:600; letter-spacing:.02em;
+    animation:drop .7s .1s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .badge b{
+    width:14px; height:14px; border-radius:50%;
+    border:3px solid var(--blue);
+    box-shadow:0 0 12px rgba(31,132,232,.8);
+    animation:glow 2.4s ease-in-out infinite;
+  }
+  @keyframes glow{ 0%,100%{ box-shadow:0 0 8px rgba(31,132,232,.5); } 50%{ box-shadow:0 0 18px rgba(31,132,232,1); } }
+  @keyframes drop{ from{ opacity:0; transform:translateY(-14px); } to{ opacity:1; transform:none; } }
+
+  /* stage */
+  .stage{
+    position:relative;
+    width:min(86vw, 370px); aspect-ratio:1;
+    display:grid; place-items:center;
+    animation:pop .9s cubic-bezier(.2,.9,.25,1.15) both;
+  }
+  @keyframes pop{ from{ opacity:0; transform:scale(.86); } to{ opacity:1; transform:scale(1); } }
+
+  .orb{
+    position:absolute; left:50%; top:-8%;
+    width:50%; aspect-ratio:1; border-radius:50%;
+    transform:translate(calc(-50% + var(--px) * 16px), calc(var(--py) * 12px));
+    background:radial-gradient(circle at 38% 32%, var(--blue-light) 0%, var(--blue) 45%, var(--blue-deep) 100%);
+    filter:drop-shadow(0 0 44px rgba(31,132,232,.6));
+    transition:transform .25s ease-out;
+  }
+  .orb::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    animation:breathe 4.2s ease-in-out infinite;
+    box-shadow:0 0 0 0 rgba(111,182,255,.45);
+  }
+  @keyframes breathe{ 0%,100%{ box-shadow:0 0 0 0 rgba(111,182,255,.45); } 50%{ box-shadow:0 0 0 22px rgba(111,182,255,0); } }
+
+  /* the diabetes ring, draws itself */
+  .ring{
+    position:absolute; inset:0; width:100%; height:100%;
+    transform:rotate(-90deg);
+    overflow:visible;
+  }
+  .ring .track{ fill:none; stroke:rgba(255,255,255,.12); stroke-width:5; }
+  .ring .draw{
+    fill:none; stroke:var(--blue); stroke-width:5; stroke-linecap:round;
+    stroke-dasharray:301.6; stroke-dashoffset:301.6;
+    animation:draw 1.8s .3s cubic-bezier(.3,.7,.2,1) forwards;
+    filter:drop-shadow(0 0 8px rgba(31,132,232,.8));
+  }
+  .ring .spark{
+    fill:none; stroke:#fff; stroke-width:5; stroke-linecap:round;
+    stroke-dasharray:14 287.6; opacity:0;
+    animation:spin 5s 2.1s linear infinite, fadein .6s 2.1s forwards;
+    transform-origin:50% 50%;
+  }
+  @keyframes draw{ to{ stroke-dashoffset:0; } }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  @keyframes fadein{ to{ opacity:.9; } }
+
+  /* glass disc */
+  .glass{
+    position:relative; z-index:2;
+    width:84%; aspect-ratio:1; border-radius:50%;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    backdrop-filter:blur(22px) saturate(160%);
+    border:1px solid var(--glass-edge);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.55),
+      inset 0 -30px 60px rgba(255,255,255,.04),
+      0 30px 80px rgba(0,0,0,.55);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; padding:26px 28px 34px; text-align:center;
+    overflow:hidden;
+    transform:translate(calc(var(--px) * 6px), calc(var(--py) * 5px));
+    transition:transform .25s ease-out;
+  }
+  .glass::before{
+    content:""; position:absolute; inset:-30%;
+    background:linear-gradient(115deg, transparent 38%, rgba(255,255,255,.22) 46%, rgba(255,255,255,.05) 52%, transparent 60%);
+    transform:rotate(-8deg); pointer-events:none;
+  }
+  .glass::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(80% 40% at 50% -5%, rgba(255,255,255,.35), transparent 70%);
     pointer-events:none;
   }
+  .glass > *{ position:relative; z-index:1; }
 
-  #hint{
-    bottom:calc(44px + env(safe-area-inset-bottom));
-    gap:7px; padding:0 26px; text-align:center;
-    transition:opacity .4s ease;
+  .eyebrow{
+    font-size:12px; font-weight:600; letter-spacing:.06em; color:var(--text-dim);
+    padding:4px 10px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.22);
   }
-  #hint strong{
-    font-size:18px; font-weight:600; color:#fff;
-    text-shadow:0 2px 14px rgba(0,0,0,.55);
+  .count{
+    display:flex; align-items:baseline; gap:6px; margin-top:4px;
+    font-weight:700; line-height:1;
   }
-  #hint small{
-    font-size:14px; color:rgba(255,255,255,.82);
-    text-shadow:0 2px 12px rgba(0,0,0,.5);
+  .count b{
+    font-size:clamp(38px, 11vw, 52px);
+    font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg, #fff 0%, var(--blue-light) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:none;
+    filter:drop-shadow(0 4px 18px rgba(31,132,232,.45));
+  }
+  .count span{ font-size:16px; font-weight:600; color:var(--text-dim); }
+  .label{ font-size:12.5px; color:var(--text-dim); margin-top:-2px; }
+
+  .glass h1{
+    margin:10px 0 0;
+    font-size:clamp(16px, 4.7vw, 19px);
+    font-weight:600; line-height:1.4;
+    text-shadow:0 2px 16px rgba(0,0,0,.35);
   }
 
-  /* the corner brackets that frame the card */
+  .glass button{
+    margin-top:12px;
+    padding:12px 34px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.4);
+    background:linear-gradient(180deg, rgba(111,182,255,.35), rgba(31,132,232,.35));
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    color:#fff; font-family:inherit; font-size:17px; font-weight:700;
+    letter-spacing:.02em; cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 12px 30px rgba(31,132,232,.35);
+    transition:transform .16s ease, box-shadow .2s ease;
+    position:relative;
+  }
+  .glass button::after{
+    content:""; position:absolute; inset:-1px; border-radius:inherit;
+    border:1px solid rgba(255,255,255,.6);
+    animation:halo 2.2s ease-out 2.4s infinite;
+    pointer-events:none;
+  }
+  @keyframes halo{ 0%{ transform:scale(1); opacity:.7; } 100%{ transform:scale(1.35); opacity:0; } }
+  .glass button:active{ transform:scale(.95); }
+  .glass button:disabled{ opacity:.75; }
+  .glass button:focus-visible{ outline:2px solid #fff; outline-offset:4px; }
+
+  /* glucose trace along the bottom of the disc */
+  .trace{
+    position:absolute; left:8%; right:8%; bottom:11%; height:30px; z-index:1;
+    opacity:.7;
+  }
+  .trace path{
+    fill:none; stroke:var(--blue-light); stroke-width:1.6; stroke-linecap:round;
+    stroke-dasharray:6 8;
+    animation:flow 6s linear infinite;
+    filter:drop-shadow(0 0 6px rgba(111,182,255,.8));
+  }
+  @keyframes flow{ to{ stroke-dashoffset:-140; } }
+
+  .foot{
+    position:absolute; bottom:calc(20px + env(safe-area-inset-bottom));
+    left:0; right:0; text-align:center;
+    font-size:11.5px; letter-spacing:.14em; color:rgba(255,255,255,.5);
+    font-family:system-ui, sans-serif; font-weight:600;
+    animation:drop .7s .3s cubic-bezier(.2,.8,.2,1) both;
+  }
+
+  /* ======================= SCANNING ======================= */
+  .overlay{
+    position:fixed; z-index:30; left:0; right:0;
+    display:flex; flex-direction:column; align-items:center;
+    pointer-events:none; transition:opacity .4s ease;
+  }
+  #hint{ bottom:calc(40px + env(safe-area-inset-bottom)); gap:6px; padding:0 26px; text-align:center; }
+  #hint strong{ font-size:17px; font-weight:600; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.6); }
+  #hint strong::after{
+    content:""; display:inline-block; width:1.4em; text-align:left;
+    animation:dots 1.4s steps(4) infinite;
+  }
+  @keyframes dots{ 0%{ content:""; } 25%{ content:"."; } 50%{ content:".."; } 75%{ content:"..."; } }
+  #hint small{ font-size:13.5px; color:rgba(255,255,255,.8); text-shadow:0 2px 12px rgba(0,0,0,.55); }
+
   #reticle{
     position:fixed; z-index:29; inset:0;
-    display:grid; place-items:center;
-    pointer-events:none;
+    display:grid; place-items:center; pointer-events:none;
     transition:opacity .4s ease;
   }
   #reticle div{
+    --c:#fff;
+    position:relative;
     width:min(66vw, 300px); aspect-ratio:4/5;
     background:
-      linear-gradient(#fff,#fff) left top/26px 2px no-repeat,
-      linear-gradient(#fff,#fff) left top/2px 26px no-repeat,
-      linear-gradient(#fff,#fff) right top/26px 2px no-repeat,
-      linear-gradient(#fff,#fff) right top/2px 26px no-repeat,
-      linear-gradient(#fff,#fff) left bottom/26px 2px no-repeat,
-      linear-gradient(#fff,#fff) left bottom/2px 26px no-repeat,
-      linear-gradient(#fff,#fff) right bottom/26px 2px no-repeat,
-      linear-gradient(#fff,#fff) right bottom/2px 26px no-repeat;
-    opacity:.82;
-    filter:drop-shadow(0 2px 8px rgba(0,0,0,.45));
+      linear-gradient(var(--c),var(--c)) left top/28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) left top/2px 28px no-repeat,
+      linear-gradient(var(--c),var(--c)) right top/28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) right top/2px 28px no-repeat,
+      linear-gradient(var(--c),var(--c)) left bottom/28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) left bottom/2px 28px no-repeat,
+      linear-gradient(var(--c),var(--c)) right bottom/28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) right bottom/2px 28px no-repeat;
+    opacity:.9;
+    filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));
+    animation:frame 2.6s ease-in-out infinite;
+    transition:transform .35s ease, opacity .35s ease, filter .35s ease;
+    overflow:hidden;
   }
+  @keyframes frame{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.025); } }
+  /* scan line */
+  #reticle div::after{
+    content:""; position:absolute; left:6%; right:6%; top:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--blue-light), #fff, var(--blue-light), transparent);
+    box-shadow:0 0 14px rgba(111,182,255,.9);
+    animation:sweep 2.2s ease-in-out infinite;
+  }
+  @keyframes sweep{ 0%{ top:4%; opacity:0; } 10%{ opacity:1; } 90%{ opacity:1; } 100%{ top:96%; opacity:0; } }
+  #reticle.locked div{
+    --c:var(--blue-light);
+    animation:none;
+    transform:scale(1.08); opacity:0;
+    filter:drop-shadow(0 0 16px rgba(31,132,232,.9));
+  }
+  #reticle.locked div::after{ display:none; }
 
-  .hidden{ opacity:0 !important; }
+  /* lock ripple */
+  #ripple{
+    position:fixed; z-index:31; left:50%; top:50%;
+    width:min(66vw,300px); aspect-ratio:1; border-radius:50%;
+    border:3px solid var(--blue);
+    transform:translate(-50%,-50%) scale(.4); opacity:0;
+    pointer-events:none;
+  }
+  #ripple.go{ animation:ripple .75s ease-out forwards; }
+  @keyframes ripple{ 0%{ transform:translate(-50%,-50%) scale(.4); opacity:.9; } 100%{ transform:translate(-50%,-50%) scale(1.5); opacity:0; } }
 
-  /* sound toggle */
+  /* glass controls */
+  .gbtn{
+    border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    color:#fff; font-family:inherit; cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 10px 26px rgba(0,0,0,.35);
+  }
   #sound{
     position:fixed; z-index:31;
-    top:calc(18px + env(safe-area-inset-top)); right:18px;
-    width:44px; height:44px; border:0; border-radius:50%;
-    background:rgba(17,20,24,.55);
-    color:#fff; font-size:19px; line-height:1;
-    display:none; place-items:center; cursor:pointer;
-    backdrop-filter:blur(6px);
+    top:calc(16px + env(safe-area-inset-top)); right:16px;
+    width:44px; height:44px; border-radius:50%;
+    font-size:18px; line-height:1;
+    display:none; place-items:center;
   }
   #sound.show{ display:grid; }
 
-  /* error / fallback message */
-  #trouble{
-    position:fixed; z-index:32; inset:auto 0 0 0;
-    padding:18px 26px calc(18px + env(safe-area-inset-bottom));
-    background:rgba(17,20,24,.9);
-    color:#fff; font-size:15px; line-height:1.55; text-align:center;
-    transform:translateY(105%); transition:transform .35s ease;
+  #chip{
+    position:fixed; z-index:31; left:50%;
+    bottom:calc(28px + env(safe-area-inset-bottom));
+    transform:translateX(-50%) translateY(20px);
+    display:flex; align-items:center; gap:10px;
+    padding:11px 18px; border-radius:999px;
+    font-size:14.5px; font-weight:600;
+    opacity:0; pointer-events:none;
+    transition:opacity .35s ease, transform .35s ease;
   }
-  #trouble.show{ transform:translateY(0); }
+  #chip.show{ opacity:1; transform:translateX(-50%); pointer-events:auto; }
+  #chip i{
+    width:9px; height:9px; border-radius:50%; background:#ff5a5f;
+    box-shadow:0 0 0 0 rgba(255,90,95,.6);
+    animation:live 1.4s ease-out infinite;
+  }
+  @keyframes live{ 0%{ box-shadow:0 0 0 0 rgba(255,90,95,.6); } 100%{ box-shadow:0 0 0 9px rgba(255,90,95,0); } }
+  #chip.replay i{ display:none; }
+  #chip.replay::before{ content:"↻"; font-size:17px; }
+
+  #trouble{
+    position:fixed; z-index:32; left:14px; right:14px;
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    padding:14px 18px; border-radius:18px;
+    border:1px solid rgba(255,255,255,.3);
+    background:rgba(6,16,28,.66);
+    -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
+    color:#fff; font-size:14.5px; line-height:1.55; text-align:center;
+    transform:translateY(130%); opacity:0;
+    transition:transform .35s ease, opacity .35s ease;
+  }
+  #trouble.show{ transform:translateY(0); opacity:1; }
 
   @media (prefers-reduced-motion: reduce){
-    .ring::after{ animation:none; }
-    *{ transition-duration:.01ms !important; }
+    *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
   }
 </style>
 </head>
 
 <body>
 
-<!-- ===================== OPENING SCREEN ===================== -->
+<!-- ======================= LANDING ======================= -->
 <div id="start">
-  <div class="mark">
-    <div class="grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <span>SQUARE</span>
+  <div class="dust" id="dust"></div>
+
+  <div class="brand"><img src="./logo.png" alt="Square"></div>
+
+  <div class="badge"><b></b>১৪ নভেম্বর · বিশ্ব ডায়াবেটিস দিবস</div>
+
+  <div class="stage" id="stage">
+    <div class="orb"></div>
+
+    <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="track" cx="50" cy="50" r="48"></circle>
+      <circle class="draw"  cx="50" cy="50" r="48"></circle>
+      <circle class="spark" cx="50" cy="50" r="48"></circle>
+    </svg>
+
+    <div class="glass">
+      <span class="eyebrow">নাসিমা বেগম, ৬১</span>
+      <div class="count"><b id="days">০</b><span>দিন</span></div>
+      <div class="label">ডায়াবেটিসের সাথে</div>
+      <h1>তিনি আপনাকে কিছু বলতে চান।</h1>
+      <button id="go" type="button">শুনুন</button>
+
+      <svg class="trace" viewBox="0 0 200 30" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 18 C 20 18, 25 8, 40 10 S 60 26, 80 20 S 100 6, 120 12 S 145 24, 165 16 S 185 10, 200 14"/>
+      </svg>
+    </div>
   </div>
 
-  <div class="ring">
-    <button id="go" type="button">ক্যামেরা<br>চালু করুন</button>
-  </div>
-
-  <h1>তিনি আপনাকে কিছু বলতে চান।</h1>
-  <p>ক্যামেরা চালু করে কার্ডটির দিকে তাকান।</p>
+  <div class="foot">SQUARE PHARMACEUTICALS PLC</div>
 </div>
 
-<!-- ===================== CAMERA OVERLAYS ===================== -->
+<!-- ======================= SCANNING ======================= -->
 <div id="reticle" class="hidden"><div></div></div>
+<div id="ripple"></div>
 
 <div id="hint" class="overlay hidden">
   <strong>কার্ডটি ক্যামেরার সামনে ধরুন</strong>
   <small>পুরো কার্ডটি ফ্রেমের ভেতরে রাখুন</small>
 </div>
 
-<button id="sound" type="button" aria-label="শব্দ চালু বা বন্ধ করুন">♪</button>
+<button id="sound" class="gbtn" type="button" aria-label="শব্দ চালু বা বন্ধ করুন">♪</button>
+<button id="chip"  class="gbtn" type="button"><i></i><span id="chipText">নাসিমা বেগম বলছেন</span></button>
 
-<div id="trouble">আলো একটু বাড়ান এবং কার্ডটি সমতল করে ধরুন। ক্যামেরা থেকে প্রায় এক হাত দূরে রাখুন।</div>
+<div id="trouble"></div>
 
-<!-- ===================== THE AR SCENE ===================== -->
+<!-- ======================= AR SCENE ======================= -->
 <a-scene
   id="scene"
   mindar-image="
@@ -224,22 +436,13 @@
   device-orientation-permission-ui="enabled: false">
 
   <a-assets timeout="30000">
-    <video id="clip"
-           src="./video_1.mp4"
-           preload="auto"
-           playsinline
-           webkit-playsinline
-           crossorigin="anonymous"></video>
+    <video id="clip" src="./video_1.mp4" preload="auto" playsinline webkit-playsinline crossorigin="anonymous"></video>
   </a-assets>
 
   <a-camera position="0 0 0" look-controls="enabled: false" cursor="fuse: false"></a-camera>
 
   <a-entity id="target" mindar-image-target="targetIndex: 0">
-    <a-video id="screen"
-             src="#clip"
-             width="1" height="1.25"
-             position="0 0 0.02"
-             visible="false"
+    <a-video id="screen" src="#clip" width="1" height="1.25" position="0 0 0.02" visible="false"
              material="shader: flat; transparent: false"></a-video>
   </a-entity>
 </a-scene>
@@ -249,27 +452,19 @@
    SETTINGS
    ============================================================ */
 
-// The printed card's size, in pixels, exactly as you sent it to the press.
-// This card is 1080 wide by 1350 tall.
+// Printed card size in pixels, exactly as sent to the press.
 const CARD_WIDTH  = 1080;
 const CARD_HEIGHT = 1350;
 
-// How the video sits on the card.
-//   'inside' = the whole video fits within the card, nothing cut off.
-//              Your 9:16 video ends up full height and about 70% of the
-//              card's width, with a strip of printed card either side.
-//   'width'  = the video fills the card's full width and spills over the
-//              top and bottom edges. Bigger and bolder, less tidy.
+// 'inside' keeps the whole video within the card. 'width' fills the width and spills over.
 const VIDEO_FIT = 'inside';
-
-// Fine tuning on top of the above. 1 is normal. 0.9 shrinks it a little,
-// 1.05 grows it a little.
 const VIDEO_SCALE = 1;
 
-// Your clip is only 10 seconds, so if the doctor looks away and comes back,
-// starting over is kinder than resuming mid sentence. Change to false if you
-// would rather it carries on from where it stopped.
+// Start the clip over each time the card is found again?
 const RESTART_EACH_TIME = true;
+
+// The number that counts up on the opening screen. 9 years = 3285 days.
+const DAYS_WITH_DIABETES = 3285;
 
 /* ============================================================
    Nothing below here needs editing.
@@ -279,123 +474,186 @@ const startScreen = document.getElementById('start');
 const goButton    = document.getElementById('go');
 const hint        = document.getElementById('hint');
 const reticle     = document.getElementById('reticle');
+const ripple      = document.getElementById('ripple');
 const trouble     = document.getElementById('trouble');
 const soundBtn    = document.getElementById('sound');
+const chip        = document.getElementById('chip');
+const chipText    = document.getElementById('chipText');
 
-const scene  = document.getElementById('scene');
-const target = document.getElementById('target');
+const scene    = document.getElementById('scene');
+const target   = document.getElementById('target');
 const screenEl = document.getElementById('screen');
-const video  = document.getElementById('clip');
+const video    = document.getElementById('clip');
 
-let audioAllowed = false;
-let troubleTimer = null;
-let hasFound = false;
+let cameraOn = false, started = false, cardInView = false, troubleTimer = null;
+
+/* --- Bangla digits --- */
+const BN = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+const toBangla = n => n.toLocaleString('en-US').replace(/\d/g, d => BN[d]);
+
+/* --- Day counter that counts up --- */
+(function countUp(){
+  const el = document.getElementById('days');
+  const dur = 1700, t0 = performance.now() + 500;
+  function tick(now){
+    const t = Math.min(1, Math.max(0, (now - t0) / dur));
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = toBangla(Math.round(DAYS_WITH_DIABETES * eased));
+    if(t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* --- Drifting particles --- */
+(function makeDust(){
+  const host = document.getElementById('dust');
+  for(let i = 0; i < 16; i++){
+    const d = document.createElement('i');
+    const size = 3 + Math.random() * 5;
+    d.style.left = (Math.random() * 100) + '%';
+    d.style.width = d.style.height = size + 'px';
+    d.style.setProperty('--sway', ((Math.random() - .5) * 60) + 'px');
+    d.style.animationDuration = (11 + Math.random() * 10) + 's';
+    d.style.animationDelay = (-Math.random() * 20) + 's';
+    host.appendChild(d);
+  }
+})();
+
+/* --- Parallax: follow the finger, and the phone's tilt where allowed --- */
+function setParallax(x, y){
+  document.documentElement.style.setProperty('--px', x.toFixed(3));
+  document.documentElement.style.setProperty('--py', y.toFixed(3));
+}
+startScreen.addEventListener('pointermove', e => {
+  const x = (e.clientX / window.innerWidth) * 2 - 1;
+  const y = (e.clientY / window.innerHeight) * 2 - 1;
+  setParallax(x, y);
+}, { passive:true });
+startScreen.addEventListener('pointerleave', () => setParallax(0, 0));
+window.addEventListener('deviceorientation', e => {
+  if(started || e.gamma == null) return;
+  setParallax(Math.max(-1, Math.min(1, e.gamma / 30)), Math.max(-1, Math.min(1, (e.beta - 45) / 30)));
+}, { passive:true });
 
 /* --- Fit the video neatly inside the printed card --- */
 function sizeVideo(){
   if(!video.videoWidth) return;
-
-  const cardW = 1;
-  const cardH = CARD_HEIGHT / CARD_WIDTH;
-  const videoRatio = video.videoWidth / video.videoHeight;
-
-  let w = cardW;
-  let h = cardW / videoRatio;
-
-  if(VIDEO_FIT === 'inside' && h > cardH){
-    h = cardH;
-    w = cardH * videoRatio;
-  }
-
+  const cardW = 1, cardH = CARD_HEIGHT / CARD_WIDTH;
+  const ratio = video.videoWidth / video.videoHeight;
+  let w = cardW, h = cardW / ratio;
+  if(VIDEO_FIT === 'inside' && h > cardH){ h = cardH; w = cardH * ratio; }
   screenEl.setAttribute('width',  (w * VIDEO_SCALE).toFixed(4));
   screenEl.setAttribute('height', (h * VIDEO_SCALE).toFixed(4));
 }
 video.addEventListener('loadedmetadata', sizeVideo);
 
-// If the video file itself cannot be loaded, say so instead of failing silently.
-video.addEventListener('error', () => {
-  trouble.textContent = 'ভিডিওটি লোড করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন। [MediaError]';
-  trouble.classList.add('show');
-});
+function showTrouble(msg){ trouble.textContent = msg; trouble.classList.add('show'); }
+trouble.addEventListener('click', () => trouble.classList.remove('show'));
 
-/* --- The tap that starts everything, and unlocks sound --- */
+/* --- Camera on. Runs on page load, and again on tap if needed --- */
+async function startCamera(){
+  if(cameraOn) return true;
+  const system = scene.systems && scene.systems['mindar-image-system'];
+  if(!system){
+    showTrouble('পেজটি পুরোপুরি লোড হয়নি। ইন্টারনেট চালু আছে কি না দেখে পেজটি আবার খুলুন।');
+    return false;
+  }
+  try{
+    await system.start();
+    cameraOn = true;
+    trouble.classList.remove('show');
+    return true;
+  }catch(e){
+    const name = (e && e.name) || '';
+    if(name === 'NotAllowedError') showTrouble('ক্যামেরার অনুমতি দেওয়া হয়নি। ব্রাউজারের সেটিংসে ক্যামেরা চালু করে আবার চেষ্টা করুন।');
+    else if(name === 'NotFoundError' || name === 'NotReadableError') showTrouble('ক্যামেরা পাওয়া যাচ্ছে না। অন্য কোনো অ্যাপ ক্যামেরা ব্যবহার করছে কি না দেখুন।');
+    else showTrouble('স্ক্যানার চালু করা গেল না। (' + (name || 'error') + ')');
+    return false;
+  }
+}
+if(scene.hasLoaded) startCamera(); else scene.addEventListener('loaded', startCamera);
+
+/* --- Unlock sound during the real finger tap --- */
+function unlockAudio(){
+  video.muted = false; video.volume = 1;
+  video.play().then(() => { video.pause(); video.currentTime = 0; })
+  .catch(() => {
+    video.muted = true; soundBtn.textContent = '✕'; soundBtn.classList.add('show');
+    video.play().then(() => { video.pause(); video.currentTime = 0; }).catch(() => {});
+  });
+}
+
+/* --- The start tap --- */
 goButton.addEventListener('click', async () => {
   goButton.disabled = true;
+  goButton.textContent = 'একটু অপেক্ষা করুন';
+  unlockAudio();
 
-  // Playing the video during a real finger tap is what buys us permission
-  // to play it with sound later on, when the card is found.
-  try{
-    video.muted = false;
-    video.volume = 1;
-    await video.play();
-    video.pause();
-    video.currentTime = 0;
-    audioAllowed = true;
-  }catch(e){
-    // The phone refused sound. Fall back to silent, and offer a sound button.
-    video.muted = true;
-    try{ await video.play(); video.pause(); video.currentTime = 0; }catch(e2){}
-    audioAllowed = false;
-    soundBtn.classList.add('show');
-  }
+  const ok = await startCamera();
+  if(!ok){ goButton.disabled = false; goButton.textContent = 'আবার চেষ্টা করুন'; return; }
 
-  startScreen.style.display = 'none';
+  started = true;
+  setParallax(0, 0);
+  startScreen.classList.add('away');
   hint.classList.remove('hidden');
   reticle.classList.remove('hidden');
+  if(cardInView) onFound();
 
-  try{
-    await scene.systems['mindar-image-system'].start();
-  }catch(e){
-    startScreen.style.display = 'flex';
-    goButton.disabled = false;
-    trouble.textContent = 'ক্যামেরা চালু করা গেল না। ব্রাউজারের সেটিংসে ক্যামেরার অনুমতি দিন, তারপর আবার চেষ্টা করুন। [' + (e && e.name ? e.name : 'Error') + ']';
-    trouble.classList.add('show');
-    return;
-  }
-
-  // If the card still has not been found after 18 seconds, offer a nudge.
   troubleTimer = setTimeout(() => {
-    if(!hasFound) trouble.classList.add('show');
+    if(!cardInView) showTrouble('আলো একটু বাড়ান এবং কার্ডটি সমতল করে ধরুন। ক্যামেরা থেকে প্রায় এক হাত দূরে রাখুন।');
   }, 18000);
 });
 
-/* --- Card found --- */
-target.addEventListener('targetFound', () => {
-  hasFound = true;
+/* --- Card found / lost --- */
+function onFound(){
   clearTimeout(troubleTimer);
-
   hint.classList.add('hidden');
-  reticle.classList.add('hidden');
   trouble.classList.remove('show');
   soundBtn.classList.add('show');
 
+  // lock feedback: brackets turn blue and dissolve, a ring ripples out, a light buzz
+  reticle.classList.add('locked');
+  ripple.classList.remove('go'); void ripple.offsetWidth; ripple.classList.add('go');
+  if(navigator.vibrate) navigator.vibrate(35);
+  setTimeout(() => { reticle.classList.add('hidden'); reticle.classList.remove('locked'); }, 400);
+
+  chip.classList.remove('replay'); chipText.textContent = 'নাসিমা বেগম বলছেন';
+  chip.classList.add('show');
+
   sizeVideo();
   screenEl.setAttribute('visible', true);
-
   if(RESTART_EACH_TIME || video.ended) video.currentTime = 0;
-  video.play().catch(() => {
-    video.muted = true;
-    video.play().catch(() => {});
-  });
-});
+  video.play().catch(() => { video.muted = true; soundBtn.textContent = '✕'; video.play().catch(() => {}); });
+}
 
-/* --- Card lost --- */
+target.addEventListener('targetFound', () => { cardInView = true; if(started) onFound(); });
+
 target.addEventListener('targetLost', () => {
+  cardInView = false;
   video.pause();
   screenEl.setAttribute('visible', false);
-  hint.classList.remove('hidden');
-  reticle.classList.remove('hidden');
+  chip.classList.remove('show');
+  if(started){ hint.classList.remove('hidden'); reticle.classList.remove('hidden'); }
+});
+
+/* --- When the clip ends, offer a replay --- */
+video.addEventListener('ended', () => {
+  if(!cardInView) return;
+  chip.classList.add('replay'); chipText.textContent = 'আবার শুনুন';
+});
+chip.addEventListener('click', () => {
+  if(!chip.classList.contains('replay')) return;
+  video.currentTime = 0;
+  video.play().catch(() => {});
+  chip.classList.remove('replay'); chipText.textContent = 'নাসিমা বেগম বলছেন';
 });
 
 /* --- Sound on and off --- */
 soundBtn.addEventListener('click', () => {
   video.muted = !video.muted;
   soundBtn.textContent = video.muted ? '✕' : '♪';
-  if(!video.muted) video.play().catch(() => { video.muted = true; soundBtn.textContent = '✕'; });
+  if(!video.muted && cardInView) video.play().catch(() => { video.muted = true; soundBtn.textContent = '✕'; });
 });
-
-/* --- Hide the nudge once the doctor taps it away --- */
-trouble.addEventListener('click', () => trouble.classList.remove('show'));
 </script>
 
 </body>
