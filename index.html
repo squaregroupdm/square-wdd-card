@@ -10,9 +10,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
 
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-
 <style>
   :root{
     --blue:#1F84E8;
@@ -35,6 +32,8 @@
   }
   a-scene{ width:100vw; height:100vh; }
   .hidden{ opacity:0 !important; pointer-events:none !important; }
+  /* The clip is only ever shown as the picture on the AR plane, never as a plain video. */
+  #clip{ display:none !important; }
 
   /* ======================= LANDING ======================= */
   #start{
@@ -358,7 +357,7 @@
     <div class="glass">
       <span class="eyebrow">নাসিমা বেগম, ৬১</span>
       <h1>তিনি আপনাকে কিছু বলতে চান।</h1>
-      <button id="go" type="button">শুনুন</button>
+      <button id="go" type="button" disabled>লোড হচ্ছে…</button>
 
       <svg class="trace" viewBox="0 0 200 30" preserveAspectRatio="none" aria-hidden="true">
         <path d="M0 18 C 20 18, 25 8, 40 10 S 60 26, 80 20 S 100 6, 120 12 S 145 24, 165 16 S 185 10, 200 14"/>
@@ -383,6 +382,13 @@
 
 <div id="trouble"></div>
 
+<!-- The clip. Kept outside the scene so the scanner can start without waiting for the whole file. -->
+<video id="clip" src="./video_1.mp4" preload="auto" playsinline webkit-playsinline crossorigin="anonymous"></video>
+
+<!-- The AR libraries. They sit here, after the landing screen, so the screen shows while they download. -->
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js" onerror="window.__libFail=(window.__libFail||[]).concat('aframe')"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js" onerror="window.__libFail=(window.__libFail||[]).concat('mind-ar')"></script>
+
 <!-- ======================= AR SCENE ======================= -->
 <a-scene
   id="scene"
@@ -397,13 +403,9 @@
     missTolerance: 12;
     warmupTolerance: 3"
   color-space="sRGB"
-  renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
+  renderer="colorManagement: true; antialias: true"
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: false">
-
-  <a-assets timeout="30000">
-    <video id="clip" src="./video_1.mp4" preload="auto" playsinline webkit-playsinline crossorigin="anonymous"></video>
-  </a-assets>
 
   <a-camera position="0 0 0" look-controls="enabled: false" cursor="fuse: false"></a-camera>
 
@@ -481,33 +483,134 @@ video.addEventListener('loadedmetadata', sizeVideo);
 function showTrouble(msg){ trouble.textContent = msg; trouble.classList.add('show'); }
 trouble.addEventListener('click', () => trouble.classList.remove('show'));
 
-/* --- Camera on. Runs on page load, and again on tap if needed --- */
-async function startCamera(){
-  if(cameraOn) return true;
-  const system = scene.systems && scene.systems['mindar-image-system'];
-  if(!system){
-    showTrouble('পেজটি পুরোপুরি লোড হয়নি। ইন্টারনেট চালু আছে কি না দেখে পেজটি আবার খুলুন।');
-    return false;
-  }
-  try{
-    await system.start();
-    cameraOn = true;
-    trouble.classList.remove('show');
-    return true;
-  }catch(e){
-    const name = (e && e.name) || '';
-    if(name === 'NotAllowedError') showTrouble('ক্যামেরার অনুমতি দেওয়া হয়নি। ব্রাউজারের সেটিংসে ক্যামেরা চালু করে আবার চেষ্টা করুন।');
-    else if(name === 'NotFoundError' || name === 'NotReadableError') showTrouble('ক্যামেরা পাওয়া যাচ্ছে না। অন্য কোনো অ্যাপ ক্যামেরা ব্যবহার করছে কি না দেখুন।');
-    else showTrouble('স্ক্যানার চালু করা গেল না। (' + (name || 'error') + ')');
-    return false;
-  }
+/* --- Optional on-screen log for testing: add ?debug to the end of the address --- */
+const debugBox = /debug/.test(location.search) ? (() => {
+  const d = document.createElement('pre');
+  d.style.cssText = 'position:fixed;left:6px;top:calc(80px + env(safe-area-inset-top));z-index:99;margin:0;max-width:72vw;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.62);color:#9f9;font:11px/1.35 monospace;white-space:pre-wrap;pointer-events:none';
+  document.body.appendChild(d);
+  return d;
+})() : null;
+const debugLines = [];
+function dlog(msg){
+  if(!debugBox) return;
+  debugLines.push((performance.now() / 1000).toFixed(1) + 's ' + msg);
+  while(debugLines.length > 12) debugLines.shift();
+  debugBox.textContent = debugLines.join('\n');
 }
+dlog(navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 90));
+window.addEventListener('error', (e) => dlog('JS error: ' + e.message));
+window.addEventListener('unhandledrejection', (e) => dlog('JS rejection: ' + (e.reason && (e.reason.name || e.reason))));
+scene.addEventListener('arReady', () => dlog('scanner ready'));
+scene.addEventListener('arError', (e) => dlog('scanner error ' + JSON.stringify(e.detail || '')));
+
+/* --- Wait until the scanner is really ready before offering the button --- */
+const BUTTON_LABEL = 'শুনুন';
+let ready = false, libsSeenAt = 0, loadFailShown = false;
+const pageOpenedAt = Date.now();
+
+function arSystem(){ return (scene.systems && scene.systems['mindar-image-system']) || null; }
+function isReady(){ const sys = arSystem(); return !!(window.AFRAME && scene.hasLoaded && sys && sys.ui); }
+
+function markReady(){
+  if(ready) return;
+  ready = true;
+  dlog('libraries + scene ready, button enabled');
+  goButton.disabled = false;
+  goButton.textContent = BUTTON_LABEL;
+  delete goButton.dataset.reload;
+  if(loadFailShown){ trouble.classList.remove('show'); loadFailShown = false; }
+}
+function loadFailed(name){
+  if(loadFailShown) return;
+  loadFailShown = true;
+  dlog('load failed: ' + name);
+  showTrouble('পেজটি পুরোপুরি লোড হয়নি। ইন্টারনেট চালু আছে কি না দেখে পেজটি আবার খুলুন। [' + name + ']');
+  goButton.disabled = false;
+  goButton.textContent = 'আবার চেষ্টা করুন';
+  goButton.dataset.reload = '1';
+}
+function hasWebGL(){
+  try{ const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }catch(e){ return false; }
+}
+(function waitForReady(){
+  if(isReady()) return markReady();
+  const waited = Date.now() - pageOpenedAt;
+  if(window.__libFail && window.__libFail.length){
+    loadFailed('ScriptError: ' + window.__libFail.join(', '));
+  }else if(window.AFRAME){
+    if(!libsSeenAt) libsSeenAt = Date.now();
+    if(Date.now() - libsSeenAt > 20000) loadFailed(!arSystem() ? 'ScriptError: mind-ar' : !hasWebGL() ? 'NoWebGL' : 'LoadTimeout');
+  }else if(waited > 45000){
+    loadFailed('ScriptError: aframe');
+  }
+  setTimeout(waitForReady, 150);
+})();
+scene.addEventListener('loaded', () => { if(isReady()) markReady(); });
+
+/* --- Remember the real camera error name. MindAR itself only reports a generic 'VIDEO_FAIL'. --- */
+let lastCameraError = null;
+if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+  const realGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  navigator.mediaDevices.getUserMedia = (constraints) =>
+    realGetUserMedia(constraints).then((stream) => { dlog('camera permission granted'); return stream; }).catch((err) => { lastCameraError = err; dlog('camera error: ' + err.name); throw err; });
+}
+function namedError(name){ const e = new Error(name); e.name = name; return e; }
+
+/* --- Camera on. MindAR's start() returns nothing; success and failure arrive as events. --- */
+let cameraStarting = false;
+function startCamera(){
+  if(cameraOn) return Promise.resolve();
+  if(cameraStarting) return Promise.reject(namedError('AlreadyStarting'));
+  return new Promise((resolve, reject) => {
+    const sys = arSystem();
+    if(!sys || !sys.ui) return reject(namedError(sys ? 'SceneNotReady' : 'ScannerMissing'));
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return reject(namedError('NoCameraAPI'));
+    cameraStarting = true;
+    lastCameraError = null;
+    const permissionHint = setTimeout(() => {
+      if(!(sys.video && sys.video.srcObject)) showTrouble('ফোন ক্যামেরার অনুমতি চাইলে অনুমতি দিন (Allow)।');
+    }, 8000);
+    const done = () => {
+      clearTimeout(permissionHint); cameraStarting = false;
+      scene.removeEventListener('arReady', onReady); scene.removeEventListener('arError', onError);
+    };
+    const onReady = () => { done(); cameraOn = true; trouble.classList.remove('show'); resolve(); };
+    const onError = (e) => {
+      done();
+      // Remove the dead camera element MindAR leaves behind, so a retry starts clean.
+      if(sys.video && !sys.video.srcObject){ sys.video.remove(); sys.video = null; }
+      reject(lastCameraError || namedError((e && e.detail && e.detail.error) || 'ARError'));
+    };
+    scene.addEventListener('arReady', onReady);
+    scene.addEventListener('arError', onError);
+    dlog('starting camera');
+    try{ sys.start(); }catch(err){ done(); reject(err); }
+  });
+}
+
+function cameraErrorMessage(err){
+  const name = (err && err.name) || 'Error';
+  let msg;
+  if(name === 'NotAllowedError' || name === 'SecurityError') msg = 'ক্যামেরার অনুমতি দেওয়া হয়নি। ব্রাউজারের সেটিংসে ক্যামেরা চালু করে আবার চেষ্টা করুন।';
+  else if(name === 'NotFoundError' || name === 'NotReadableError' || name === 'OverconstrainedError' || name === 'AbortError') msg = 'ক্যামেরা পাওয়া যাচ্ছে না। অন্য কোনো অ্যাপ ক্যামেরা ব্যবহার করছে কি না দেখুন।';
+  else if(name === 'NoCameraAPI') msg = 'এই ব্রাউজারে ক্যামেরা চালু করা যায় না। লিংকটি Chrome বা Safari-তে খুলুন।';
+  else if(name === 'SceneNotReady' || name === 'ScannerMissing') msg = 'স্ক্যানার এখনো তৈরি হয়নি। একটু পরে আবার চেষ্টা করুন।';
+  else msg = 'স্ক্যানার চালু করা গেল না।';
+  return msg + ' [' + name + ']';
+}
+
+/* --- If the clip itself cannot load, say so instead of failing silently later --- */
+video.addEventListener('error', () => {
+  const code = video.error ? video.error.code : '?';
+  showTrouble('ভিডিওটি লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে পেজটি আবার খুলুন। [MediaError ' + code + ']');
+});
 
 /* --- Unlock sound during the real finger tap --- */
 function unlockAudio(){
   video.muted = false; video.volume = 1;
-  video.play().then(() => { video.pause(); video.currentTime = 0; })
-  .catch(() => {
+  video.play().then(() => { video.pause(); video.currentTime = 0; dlog('sound unlocked'); })
+  .catch((e) => {
+    dlog('sound blocked: ' + (e && e.name));
     video.muted = true; soundBtn.textContent = '✕'; soundBtn.classList.add('show');
     video.play().then(() => { video.pause(); video.currentTime = 0; }).catch(() => {});
   });
@@ -515,26 +618,31 @@ function unlockAudio(){
 
 /* --- The start tap --- */
 goButton.addEventListener('click', async () => {
+  if(goButton.dataset.reload){ location.reload(); return; }
+  dlog('tap');
   goButton.disabled = true;
   unlockAudio();
 
   // Lift the glass straight away so the tap feels instant, then bring the camera up behind it.
   started = true;
   startScreen.classList.add('away');
+  startScreen.addEventListener('transitionend', () => { if(started) startScreen.classList.add('gone'); }, { once:true });
   hint.classList.remove('hidden');
   reticle.classList.remove('hidden');
 
-  const ok = await startCamera();
-  if(!ok){
+  try{
+    await startCamera();
+  }catch(err){
     // Camera refused: bring the glass back so the doctor can try again.
     started = false;
-    startScreen.classList.remove('away');
+    startScreen.classList.remove('away', 'gone');
     hint.classList.add('hidden');
     reticle.classList.add('hidden');
+    dlog('camera failed: ' + ((err && err.name) || err));
+    showTrouble(cameraErrorMessage(err));
     goButton.disabled = false; goButton.textContent = 'আবার চেষ্টা করুন';
     return;
   }
-  startScreen.addEventListener('transitionend', () => startScreen.classList.add('gone'), { once:true });
   if(cardInView) onFound();
 
   troubleTimer = setTimeout(() => {
@@ -564,9 +672,10 @@ function onFound(){
   video.play().catch(() => { video.muted = true; soundBtn.textContent = '✕'; video.play().catch(() => {}); });
 }
 
-target.addEventListener('targetFound', () => { cardInView = true; if(started) onFound(); });
+target.addEventListener('targetFound', () => { dlog('card found'); cardInView = true; if(started) onFound(); });
 
 target.addEventListener('targetLost', () => {
+  dlog('card lost');
   cardInView = false;
   video.pause();
   screenEl.setAttribute('visible', false);
@@ -576,6 +685,7 @@ target.addEventListener('targetLost', () => {
 
 /* --- When the clip ends, offer a replay --- */
 video.addEventListener('ended', () => {
+  dlog('clip ended');
   if(!cardInView) return;
   chip.classList.add('replay'); chipText.textContent = 'আবার শুনুন';
 });
