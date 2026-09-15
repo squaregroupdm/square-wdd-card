@@ -400,8 +400,8 @@
     uiError: no;
     filterMinCF: 0.0001;
     filterBeta: 0.005;
-    missTolerance: 12;
-    warmupTolerance: 3"
+    missTolerance: 24;
+    warmupTolerance: 5"
   color-space="sRGB"
   renderer="colorManagement: true; antialias: true"
   vr-mode-ui="enabled: false"
@@ -430,6 +430,10 @@ const VIDEO_SCALE = 1;
 
 // Start the clip over each time the card is found again?
 const RESTART_EACH_TIME = true;
+
+// Extra steadying of the video on the card. 1 = no extra steadying, 0.1 = very steady but follows
+// movement slowly. Lower this if the video shakes; raise it if it lags behind the card.
+const STEADY = 0.08;
 
 
 /* ============================================================
@@ -546,6 +550,24 @@ function hasWebGL(){
   setTimeout(waitForReady, 150);
 })();
 scene.addEventListener('loaded', () => { if(isReady()) markReady(); });
+
+/* --- Extra steadying: average the card's position over recent frames so small twitches cancel out --- */
+function installSteadying(){
+  const comp = target.components && target.components['mindar-image-target'];
+  if(!comp || comp.__steadied || typeof comp.updateWorldMatrix !== 'function') return;
+  comp.__steadied = true;
+  const original = comp.updateWorldMatrix.bind(comp);
+  let smooth = null;
+  comp.updateWorldMatrix = function(worldMatrix){
+    if(!worldMatrix){ smooth = null; return original(worldMatrix); }
+    if(!smooth){ smooth = worldMatrix.slice(); }
+    else{ for(let i = 0; i < 16; i++) smooth[i] += (worldMatrix[i] - smooth[i]) * STEADY; }
+    return original(smooth);
+  };
+  dlog('steadying on');
+}
+scene.addEventListener('loaded', installSteadying);
+if(scene.hasLoaded) installSteadying();
 
 /* --- Remember the real camera error name. MindAR itself only reports a generic 'VIDEO_FAIL'. --- */
 let lastCameraError = null;
