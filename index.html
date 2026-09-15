@@ -562,7 +562,7 @@ function installSteadying(){
     if(!worldMatrix){ smooth = null; return original(worldMatrix); }
     if(!smooth){ smooth = worldMatrix.slice(); }
     else{ for(let i = 0; i < 16; i++) smooth[i] += (worldMatrix[i] - smooth[i]) * STEADY; }
-    return original(smooth);
+    return original(smooth.slice());
   };
   dlog('steadying on');
 }
@@ -629,12 +629,12 @@ video.addEventListener('error', () => {
 
 /* --- Unlock sound during the real finger tap --- */
 function unlockAudio(){
-  video.muted = false; video.volume = 1;
-  video.play().then(() => { video.pause(); video.currentTime = 0; dlog('sound unlocked'); })
+  video.muted = false; video.volume = 0;
+  video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; dlog('sound unlocked'); })
   .catch((e) => {
     dlog('sound blocked: ' + (e && e.name));
     video.muted = true; soundBtn.textContent = '✕'; soundBtn.classList.add('show');
-    video.play().then(() => { video.pause(); video.currentTime = 0; }).catch(() => {});
+    video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; }).catch(() => { video.volume = 1; });
   });
 }
 
@@ -691,6 +691,7 @@ function onFound(){
   sizeVideo();
   screenEl.setAttribute('visible', true);
   if(RESTART_EACH_TIME || video.ended) video.currentTime = 0;
+  video.volume = 1;
   video.play().catch(() => { video.muted = true; soundBtn.textContent = '✕'; video.play().catch(() => {}); });
 }
 
