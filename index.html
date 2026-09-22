@@ -237,7 +237,7 @@
   #reticle div{
     --c:#fff;
     position:relative;
-    width:min(66vw, 300px); aspect-ratio:4/5;
+    width:min(60vw, 280px); aspect-ratio:1414/2000;
     background:
       linear-gradient(var(--c),var(--c)) left top/28px 2px no-repeat,
       linear-gradient(var(--c),var(--c)) left top/2px 28px no-repeat,
@@ -421,12 +421,12 @@
    ============================================================ */
 
 // Printed card size in pixels, exactly as sent to the press.
-const CARD_WIDTH  = 1080;
-const CARD_HEIGHT = 1350;
+const CARD_WIDTH  = 1414;
+const CARD_HEIGHT = 2000;
 
 // 'inside' keeps the whole video within the card. 'width' fills the width and spills over.
 const VIDEO_FIT = 'inside';
-const VIDEO_SCALE = 1;
+const VIDEO_SCALE = 1.15;
 
 // Start the clip over each time the card is found again?
 const RESTART_EACH_TIME = true;
@@ -621,6 +621,12 @@ function cameraErrorMessage(err){
   return msg + ' [' + name + ']';
 }
 
+/* --- Safety guard: the clip may only run while the card is in view --- */
+let unlocking = false;
+video.addEventListener('timeupdate', () => {
+  if(!video.paused && !cardInView && !unlocking){ video.pause(); video.currentTime = 0; dlog('stopped clip: card not in view'); }
+});
+
 /* --- If the clip itself cannot load, say so instead of failing silently later --- */
 video.addEventListener('error', () => {
   const code = video.error ? video.error.code : '?';
@@ -629,12 +635,13 @@ video.addEventListener('error', () => {
 
 /* --- Unlock sound during the real finger tap --- */
 function unlockAudio(){
+  unlocking = true;
   video.muted = false; video.volume = 0;
-  video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; dlog('sound unlocked'); })
+  video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; unlocking = false; dlog('sound unlocked'); })
   .catch((e) => {
     dlog('sound blocked: ' + (e && e.name));
     video.muted = true; soundBtn.textContent = '✕'; soundBtn.classList.add('show');
-    video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; }).catch(() => { video.volume = 1; });
+    video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; unlocking = false; }).catch(() => { video.volume = 1; unlocking = false; });
   });
 }
 
