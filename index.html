@@ -165,7 +165,7 @@
   }
 
   .glass h1{
-    margin:12px 0 0;
+    margin:0;
     font-size:clamp(22px, 6.2vw, 28px);
     font-weight:700; line-height:1.35;
     text-shadow:0 2px 16px rgba(0,0,0,.35);
@@ -356,7 +356,6 @@
     </svg>
 
     <div class="glass">
-      <span class="eyebrow">নাসিমা বেগম, ৬১</span>
       <h1>তিনি আপনাকে কিছু বলতে চান।</h1>
       <button id="go" type="button" disabled>লোড হচ্ছে…</button>
 
@@ -379,7 +378,7 @@
 </div>
 
 <button id="sound" class="gbtn" type="button" aria-label="শব্দ চালু বা বন্ধ করুন">♪</button>
-<button id="chip"  class="gbtn" type="button"><i></i><span id="chipText">নাসিমা বেগম বলছেন</span></button>
+<button id="chip"  class="gbtn" type="button"><i></i><span id="chipText">ভিডিও চলছে</span></button>
 
 <div id="trouble"></div>
 
@@ -696,7 +695,7 @@ function onFound(){
   if(navigator.vibrate) navigator.vibrate(35);
   setTimeout(() => { reticle.classList.add('hidden'); reticle.classList.remove('locked'); }, 400);
 
-  chip.classList.remove('replay'); chipText.textContent = 'নাসিমা বেগম বলছেন';
+  chip.classList.remove('replay'); chipText.textContent = 'ভিডিও চলছে';
   chip.classList.add('show');
 
   sizeVideo();
@@ -719,7 +718,7 @@ target.addEventListener('targetLost', () => {
 
 /* --- While the clip is buffering, say so on the chip --- */
 video.addEventListener('waiting', () => { if(cardInView && !video.paused) chipText.textContent = 'লোড হচ্ছে…'; });
-video.addEventListener('playing', () => { if(cardInView) chipText.textContent = 'নাসিমা বেগম বলছেন'; });
+video.addEventListener('playing', () => { if(cardInView) chipText.textContent = 'ভিডিও চলছে'; });
 
 /* --- When the clip ends, offer a replay --- */
 video.addEventListener('ended', () => {
@@ -731,7 +730,7 @@ chip.addEventListener('click', () => {
   if(!chip.classList.contains('replay')) return;
   video.currentTime = 0;
   video.play().catch(() => {});
-  chip.classList.remove('replay'); chipText.textContent = 'নাসিমা বেগম বলছেন';
+  chip.classList.remove('replay'); chipText.textContent = 'ভিডিও চলছে';
 });
 
 /* --- Sound on and off --- */
