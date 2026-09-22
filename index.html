@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="bn" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#06101c">
+<meta name="google" content="notranslate">
 <title>Square | তিনি আপনাকে কিছু বলতে চান</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -634,15 +635,18 @@ video.addEventListener('error', () => {
 });
 
 /* --- Unlock sound during the real finger tap --- */
+// Calling play() inside a real tap is what earns permission to play with sound later. Pausing in the
+// same instant means not a single frame of audio can leak, even while the camera popup is open.
 function unlockAudio(){
   unlocking = true;
-  video.muted = false; video.volume = 0;
-  video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; unlocking = false; dlog('sound unlocked'); })
-  .catch((e) => {
-    dlog('sound blocked: ' + (e && e.name));
-    video.muted = true; soundBtn.textContent = '✕'; soundBtn.classList.add('show');
-    video.play().then(() => { video.pause(); video.currentTime = 0; video.volume = 1; unlocking = false; }).catch(() => { video.volume = 1; unlocking = false; });
-  });
+  video.muted = false; video.volume = 1;
+  let p;
+  try{ p = video.play(); }catch(e){ p = Promise.reject(e); }
+  video.pause();
+  try{ video.currentTime = 0; }catch(e){}
+  unlocking = false;
+  if(p && p.catch) p.catch(() => {});
+  dlog('sound unlock requested');
 }
 
 /* --- The start tap --- */
@@ -712,6 +716,10 @@ target.addEventListener('targetLost', () => {
   chip.classList.remove('show');
   if(started){ hint.classList.remove('hidden'); reticle.classList.remove('hidden'); }
 });
+
+/* --- While the clip is buffering, say so on the chip --- */
+video.addEventListener('waiting', () => { if(cardInView && !video.paused) chipText.textContent = 'লোড হচ্ছে…'; });
+video.addEventListener('playing', () => { if(cardInView) chipText.textContent = 'নাসিমা বেগম বলছেন'; });
 
 /* --- When the clip ends, offer a replay --- */
 video.addEventListener('ended', () => {
